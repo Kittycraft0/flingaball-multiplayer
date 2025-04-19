@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fling Balls</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #181c24;
+    }
+    body {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    #canvas-container {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 800px;
+      height: 600px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 32px #000a;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #111;
+    }
+    canvas {
+      display: block;
+      background: #111;
+      width: 800px;
+      height: 600px;
+    }
+    #chat-container {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      z-index: 10;
+      color: white;
+      width: 320px;
+      background: rgba(30, 34, 44, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 2px 12px #0007;
+      padding: 12px 10px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #messages {
+      height: 160px;
+      overflow-y: auto;
+      width: 100%;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    #chat-input {
+      width: 100%;
+      border-radius: 6px;
+      border: none;
+      padding: 6px;
+      font-size: 15px;
+      background: #23273a;
+      color: #fff;
+      outline: none;
+    }
+    #leaderboard {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      color: white;
+      background: rgba(30, 34, 44, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 2px 12px #0007;
+      padding: 12px 18px 10px 18px;
+      min-width: 180px;
+      text-align: left;
+    }
+    #leaderboard h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      text-align: center;
+    }
+    #nameInput, button[onclick="setName()"] {
+      position: absolute;
+      left: 50%;
+      top: 10%;
+      transform: translate(-50%, 0);
+      z-index: 20;
+      font-size: 18px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      margin-right: 6px;
+    }
+    button[onclick="setName()"] {
+      left: calc(50% + 120px);
+      top: 10%;
+      transform: translate(-50%, 0);
+      background: #2e8fff;
+      color: #fff;
+      cursor: pointer;
+    }
+    #loading-bar-container {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #181c24;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transition: opacity 0.5s;
+    }
+    #loading-bar {
+      width: 60vw;
+      max-width: 400px;
+      height: 18px;
+      background: #222;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 12px #0007;
+    }
+    #loading-bar-inner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2e8fff, #00e0ff);
+      border-radius: 10px;
+      transition: width 0.2s;
+    }
+    #loading-bar-text {
+      color: #fff;
+      font-size: 20px;
+      text-align: center;
+      font-family: sans-serif;
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+    /* --- Responsive for mobile --- */
+    @media (max-width: 900px), (max-height: 700px) {
+      #canvas-container {
+        position: fixed;
+        left: 50%;
+        top: 55%; /* move canvas down to avoid leaderboard */
+        width: 100vw;
+        height: 75vw; /* Use 4:3 aspect ratio for canvas area */
+        max-width: 100vw;
+        max-height: 100vh;
+        min-width: 0;
+        min-height: 0;
+        transform: translate(-50%, -50%);
+        border-radius: 0;
+        z-index: 10;
+      }
+      canvas {
+        width: 100vw !important;
+        height: 75vw !important; /* 4:3 aspect ratio */
+        max-width: 100vw;
+        max-height: 75vw;
+        display: block;
+      }
+      #chat-container, #leaderboard {
+        width: 90vw !important;
+        min-width: 0 !important;
+        left: 5vw !important;
+        right: 5vw !important;
+        font-size: 15px;
+      }
+      #chat-container {
+        bottom: 10px;
+        padding: 8px 4px 8px 4px;
+      }
+      #leaderboard {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        margin: 0 auto;
+        width: 100vw !important;
+        max-width: 100vw;
+        border-radius: 0;
+        background: rgba(30, 34, 44, 0.98);
+        z-index: 100;
+        box-shadow: 0 2px 12px #0007;
+        padding: 8px 0 8px 0;
+      }
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="loading-bar-container">
+      <div id="loading-bar">
+        <div id="loading-bar-inner"></div>
+      </div>
+      <div id="loading-bar-text">Loading...</div>
+    </div>
+    <input id="nameInput" placeholder="Enter your name" />
+    <button onclick="setName()">Join</button>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
+    </div>
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+    </div>
+    <div id="canvas-container">
+      <canvas id="canvas" width="800" height="600"></canvas>
+      <button id="view-btn" style="position:absolute;top:10px;left:10px;z-index:30;padding:6px 14px;border-radius:8px;border:none;background:#2e8fff;color:#fff;font-size:16px;cursor:pointer;">Center On Me</button>
+    </div>
+  
+  <script>
+    // --- Loading progress bar logic ---
+    let loadingProgress = 0;
+    let loadingDone = false;
+    let loadingInterval = null;
+    function setLoadingProgress(pct, text) {
+      const bar = document.getElementById('loading-bar-inner');
+      const txt = document.getElementById('loading-bar-text');
+      bar.style.width = Math.round(pct * 100) + "%";
+      if (text) txt.textContent = text;
+    }
+    function hideLoadingBar() {
+      const cont = document.getElementById('loading-bar-container');
+      cont.style.opacity = "0";
+      setTimeout(() => { cont.style.display = "none"; }, 600);
+      if (loadingInterval) clearInterval(loadingInterval);
+    }
+
+    // --- Responsive, animated loading bar ---
+    let loadingStage = 0;
+    let gotInit = false, gotState = false;
+    const socket = io();
+
+    // Animate progress bar smoothly up to a target value
+    let loadingTarget = 0.1;
+    setLoadingProgress(loadingTarget, "Connecting...");
+
+    function animateLoadingBar() {
+      if (loadingDone) return;
+      loadingProgress += (loadingTarget - loadingProgress) * 0.15;
+      setLoadingProgress(loadingProgress, loadingBarTextForStage(loadingStage));
+      if (!loadingDone) {
+        loadingInterval = requestAnimationFrame(animateLoadingBar);
+      }
+    }
+    function loadingBarTextForStage(stage) {
+      if (stage === 0) return "Connecting...";
+      if (stage === 1) return "Connected. Waiting for server...";
+      if (stage === 2) return "Initializing...";
+      if (stage === 3) return "Receiving game state...";
+      if (stage === 4) return "Almost ready...";
+      if (stage === 5) return "Loaded!";
+      return "Loading...";
+    }
+    animateLoadingBar();
+
+    socket.on('connect', () => {
+      loadingStage = 1;
+      loadingTarget = 0.3;
+    });
+
+    socket.on('init', (data) => {
+      gotInit = true;
+      loadingStage = 2;
+      loadingTarget = 0.55;
+      checkLoaded();
+    });
+
+    socket.on('state', (data) => {
+      gotState = true;
+      loadingStage = 3;
+      loadingTarget = 0.85;
+      checkLoaded();
+    });
+
+    // Simulate a little more progress before hiding
+    function checkLoaded() {
+      if (gotInit && gotState && !loadingDone) {
+        loadingStage = 4;
+        loadingTarget = 0.97;
+        setTimeout(() => {
+          loadingStage = 5;
+          loadingTarget = 1;
+          setTimeout(() => {
+            loadingDone = true;
+            hideLoadingBar();
+          }, 400);
+        }, 350);
+      }
+    }
+
+    // --- Responsive canvas sizing for mobile ---
+    function resizeCanvas() {
+      const container = document.getElementById('canvas-container');
+      const canvas = document.getElementById('canvas');
+      let w = 800, h = 600;
+      if (window.innerWidth < 900 || window.innerHeight < 700) {
+        // Fit to viewport, keep 4:3 aspect ratio
+        let vw = window.innerWidth;
+        let wMobile = vw;
+        let hMobile = vw * 0.75; // 4:3 aspect ratio
+        // If height is too small, fit to height instead
+        if (hMobile > window.innerHeight * 0.85) {
+          hMobile = window.innerHeight * 0.85;
+          wMobile = hMobile * (4 / 3);
+        }
+        container.style.width = wMobile + "px";
+        container.style.height = hMobile + "px";
+        canvas.style.width = wMobile + "px";
+        canvas.style.height = hMobile + "px";
+      } else {
+        container.style.width = "800px";
+        container.style.height = "600px";
+        canvas.style.width = "800px";
+        canvas.style.height = "600px";
+      }
+      // Call updateViewportSize() whenever a resize is made
+      updateViewportSize();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', resizeCanvas);
+    window.addEventListener('DOMContentLoaded', resizeCanvas);
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let VIEWPORT_W = 800, VIEWPORT_H = 600;
+
+    function updateViewportSize() {
+      // Update viewport size for rendering logic
+      const rect = canvas.getBoundingClientRect();
+      VIEWPORT_W = rect.width;
+      VIEWPORT_H = rect.height;
+      // Also set the canvas internal resolution for crisp rendering
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+    window.addEventListener('resize', updateViewportSize);
+    window.addEventListener('orientationchange', updateViewportSize);
+    window.addEventListener('DOMContentLoaded', updateViewportSize);
+
+    let myId = null;
+    let myName = '';
+    let gameState = { balls: {}, stars: [], powerUps: [], players: {}, canvasWidth: 4000, canvasHeight: 3000 };
+
+    // --- Camera/zoom state ---
+    let centerOnPlayer = true; // true = follow player, false = full board view
+    let playerZoom = 1; // zoom factor for player-follow mode
+    let minZoom = 0.3, maxZoom = 2.5;
+
+    function setName() {
+      myName = document.getElementById('nameInput').value.trim();
+      if (myName) {
+        socket.emit('setName', myName);
+        document.getElementById('nameInput').style.display = 'none';
+        document.querySelector('button').style.display = 'none';
+      }
+    }
+
+    let dragging = false;
+    let mouse = { x: 0, y: 0 };
+
+    // --- Button logic ---
+    document.getElementById('view-btn').onclick = function() {
+      centerOnPlayer = !centerOnPlayer;
+      this.textContent = centerOnPlayer ? "Center On Me" : "Full Board";
+    };
+
+    // --- Orbital mechanics toggle ---
+    let orbitalMechanics = false;
+
+    // Add a toggle button for orbital mechanics
+    const orbitalBtn = document.createElement('button');
+    orbitalBtn.textContent = "Enable Orbital Mechanics";
+    orbitalBtn.style.position = "absolute";
+    orbitalBtn.style.top = "10px";
+    orbitalBtn.style.right = "10px";
+    orbitalBtn.style.zIndex = "30";
+    orbitalBtn.style.padding = "6px 14px";
+    orbitalBtn.style.borderRadius = "8px";
+    orbitalBtn.style.border = "none";
+    orbitalBtn.style.background = "#2e8fff";
+    orbitalBtn.style.color = "#fff";
+    orbitalBtn.style.fontSize = "16px";
+    orbitalBtn.style.cursor = "pointer";
+    orbitalBtn.onclick = function() {
+      orbitalMechanics = !orbitalMechanics;
+      orbitalBtn.textContent = orbitalMechanics ? "Disable Orbital Mechanics" : "Enable Orbital Mechanics";
+      // Optionally, emit to server or trigger local logic here
+    };
+    document.getElementById('canvas-container').appendChild(orbitalBtn);
+
+    // --- Mouse wheel zoom for player-follow mode ---
+    canvas.addEventListener('wheel', function(e) {
+      if (centerOnPlayer) {
+        e.preventDefault();
+        // Zoom in/out
+        let delta = e.deltaY < 0 ? 1.1 : 0.9;
+        playerZoom *= delta;
+        playerZoom = Math.max(minZoom, Math.min(maxZoom, playerZoom));
+      }
+    }, { passive: false });
+
+    socket.on('init', (data) => {
+      myId = data.id;
+    });
+
+    socket.on('state', (data) => {
+      gameState = data;
+      // Leaderboard update
+      const leaderboardDiv = document.getElementById('leaderboard');
+      let arr = [];
+      // Show all players and AIs in leaderboard
+      for (const id in data.balls) {
+        const b = data.balls[id];
+        arr.push({
+          name: b.name || (b.isAI ? "AI" : "Unnamed"),
+          score: b.score || 0,
+          isAI: !!b.isAI
+        });
+      }
+      leaderboardDiv.innerHTML = '<h3>Leaderboard</h3>';
+      arr
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .forEach(player => {
+          const playerElement = document.createElement('div');
+          playerElement.textContent = `${player.name}${player.isAI ? " [AI]" : ""}: ${player.score || 0}`;
+          leaderboardDiv.appendChild(playerElement);
+        });
+    });
+
+    // Chat logic
+    const chatInput = document.getElementById('chat-input');
+    const messagesDiv = document.getElementById('messages');
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && chatInput.value.trim()) {
+        const message = chatInput.value.trim();
+        // Show your own message immediately
+        const messageElement = document.createElement('div');
+        messageElement.innerHTML = `<b style="color:#2e8fff">${myName || 'You'}</b>: ${message}`;
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        socket.emit('chatMessage', message);
+        chatInput.value = '';
+      }
+    });
+    socket.on('chatMessage', (data) => {
+      const messageElement = document.createElement('div');
+      // Try to show player name if available
+      let name = data.player;
+      if (gameState.balls && gameState.balls[data.player] && gameState.balls[data.player].name) {
+        name = gameState.balls[data.player].name;
+      }
+      messageElement.innerHTML = `<b style="color:#2e8fff">${name}</b>: ${data.message}`;
+      messagesDiv.appendChild(messageElement);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // --- Mouse controls (relative to canvas) ---
+    function getCanvasMouse(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+    canvas.addEventListener('mousedown', e => {
+      dragging = true;
+      const pos = getCanvasMouse(e);
+      mouse.x = pos.x;
+      mouse.y = pos.y;
+    });
+    canvas.addEventListener('mousemove', e => {
+      const pos = getCanvasMouse(e);
+      mouse.x = pos.x;
+      mouse.y = pos.y;
+    });
+    canvas.addEventListener('mouseup', () => {
+      dragging = false;
+    });
+
+    // --- Touch controls for mobile ---
+    function getCanvasTouch(touch) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+        y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      dragging = true;
+      if (e.touches.length > 0) {
+        const pos = getCanvasTouch(e.touches[0]);
+        mouse.x = pos.x;
+        mouse.y = pos.y;
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        const pos = getCanvasTouch(e.touches[0]);
+        mouse.x = pos.x;
+        mouse.y = pos.y;
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      dragging = false;
+    }, { passive: false });
+
+    // Send chain event every frame while dragging, even if mouse is not moving
+    setInterval(() => {
+      if (dragging && gameState.balls[myId]) {
+        let mouseWorld;
+        const cam = getCamera();
+        // Always map mouse to world coordinates for both camera modes
+        if (cam.fullBoard) {
+          mouseWorld = {
+            x: (mouse.x - cam.offsetX) / cam.scale,
+            y: (mouse.y - cam.offsetY) / cam.scale
+          };
+        } else {
+          mouseWorld = {
+            x: mouse.x / cam.scale + cam.x,
+            y: mouse.y / cam.scale + cam.y
+          };
+        }
+        socket.emit('chain', mouseWorld);
+      }
+    }, 1000 / 60);
+
+    // Camera follows player or shows whole board in full board mode
+    function getCamera() {
+      // Full board view
+      if (!centerOnPlayer && gameState.canvasWidth && gameState.canvasHeight) {
+        const scaleX = VIEWPORT_W / gameState.canvasWidth;
+        const scaleY = VIEWPORT_H / gameState.canvasHeight;
+        const scale = Math.min(scaleX, scaleY);
+        const offsetX = (VIEWPORT_W - gameState.canvasWidth * scale) / 2;
+        const offsetY = (VIEWPORT_H - gameState.canvasHeight * scale) / 2;
+        return { x: 0, y: 0, scale, offsetX, offsetY, fullBoard: true };
+      }
+      // Center on player, zoom based on player size and scroll
+      let x = 0, y = 0, scale = 1, offsetX = 0, offsetY = 0;
+      if (gameState.balls[myId]) {
+        const b = gameState.balls[myId];
+        // Default zoom: fit player + some area, proportional to player size
+        const baseView = 320; // base view size for a radius 20 ball
+        const r0 = 20, rStar = 6;
+        const playerRadius = Math.sqrt(r0 * r0 + (b.score || 0) * rStar * rStar);
+        // The view size grows with player size
+        let desiredView = baseView + playerRadius * 6;
+        // Clamp so you can't zoom out further than full board
+        let maxView = Math.max(gameState.canvasWidth || 4000, gameState.canvasHeight || 3000);
+        let viewSize = Math.max(desiredView / playerZoom, baseView / minZoom);
+        viewSize = Math.min(viewSize, maxView);
+        scale = VIEWPORT_W / viewSize;
+        // Center camera on player
+        x = b.x - VIEWPORT_W / (2 * scale);
+        y = b.y - VIEWPORT_H / (2 * scale);
+        // Clamp camera to board
+        x = Math.max(0, Math.min((gameState.canvasWidth || 4000) - VIEWPORT_W / scale, x));
+        y = Math.max(0, Math.min((gameState.canvasHeight || 3000) - VIEWPORT_H / scale, y));
+      }
+      return { x, y, scale, offsetX, offsetY, fullBoard: false };
+    }
+
+    // Main render loop
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const cam = getCamera();
+
+      // --- No canvas transforms, do all math manually ---
+
+      // Draw stars
+      ctx.fillStyle = "gold";
+      for (const star of gameState.stars) {
+        // If orbital mechanics are off, draw as usual
+        // If orbital mechanics are on, you can optionally change how stars are drawn or move
+        // (This is just a placeholder for your orbital logic)
+        // Example: if (orbitalMechanics) { ... }
+        const screen = worldToScreen(star.x, star.y, cam);
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, star.r * cam.scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw super star
+      if (gameState.superStar) {
+        const screen = worldToScreen(gameState.superStar.x, gameState.superStar.y, cam);
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, gameState.superStar.r * cam.scale, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff0";
+        ctx.shadowColor = "#fff";
+        ctx.shadowBlur = 16 * cam.scale;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Draw power-ups
+      for (const powerUp of gameState.powerUps) {
+        const screen = worldToScreen(powerUp.x, powerUp.y, cam);
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, 10 * cam.scale, 0, Math.PI * 2);
+        ctx.fillStyle = powerUp.type === "speed" ? "yellow" : "purple";
+        ctx.fill();
+      }
+
+      // Draw balls
+      for (const id in gameState.balls) {
+        const b = gameState.balls[id];
+        let color = "#f55";
+        if (gameState.players && gameState.players[id] && gameState.players[id].team) {
+          color = gameState.players[id].team === "red" ? "red" : "blue";
+        }
+        if (b.isAI) color = "#aaa";
+        if (id === myId && centerOnPlayer) color = "#0ff";
+        const r0 = 20;
+        const rStar = 6;
+        let drawRadius = Math.sqrt(r0 * r0 + (b.score || 0) * rStar * rStar);
+
+        const screen = worldToScreen(b.x, b.y, cam);
+
+        // --- Stylized ball rendering ---
+
+        // Draw a radial gradient for a 3D effect
+        const grad = ctx.createRadialGradient(
+          screen.x - drawRadius * cam.scale * 0.3, screen.y - drawRadius * cam.scale * 0.3, drawRadius * cam.scale * 0.2,
+          screen.x, screen.y, drawRadius * cam.scale
+        );
+        grad.addColorStop(0, "#fff");
+        grad.addColorStop(0.2, color);
+        grad.addColorStop(1, "#222");
+
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, drawRadius * cam.scale, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 16 * cam.scale;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Add a glossy highlight
+        ctx.beginPath();
+        ctx.ellipse(
+          screen.x - drawRadius * cam.scale * 0.4,
+          screen.y - drawRadius * cam.scale * 0.4,
+          drawRadius * cam.scale * 0.35,
+          drawRadius * cam.scale * 0.18,
+          Math.PI / 6, 0, Math.PI * 2
+        );
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.fill();
+
+        // Add a subtle outline
+        ctx.lineWidth = 3 * cam.scale;
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, drawRadius * cam.scale, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Draw speed boost ring if needed
+        if (b.speedBoost) {
+          ctx.strokeStyle = "red";
+          ctx.lineWidth = 4 * cam.scale;
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, (drawRadius + 4) * cam.scale, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Draw name
+        ctx.fillStyle = 'white';
+        ctx.font = `${14 * cam.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(b.name || '', screen.x, screen.y - drawRadius * cam.scale - 5 * cam.scale);
+
+        // Draw score for self
+        if (id === myId && centerOnPlayer) {
+          ctx.fillStyle = "black";
+          ctx.font = `${16 * cam.scale}px sans-serif`;
+          ctx.fillText(`Score: ${b.score || 0}`, screen.x, screen.y - drawRadius * cam.scale - 20 * cam.scale);
+        }
+      }
+
+      // Draw straight line between your player and your mouse ONLY when dragging
+      if (dragging && gameState.balls[myId]) {
+        let mouseWorld;
+        const cam = getCamera();
+        if (cam.fullBoard) {
+          mouseWorld = {
+            x: (mouse.x - cam.offsetX) / cam.scale,
+            y: (mouse.y - cam.offsetY) / cam.scale
+          };
+        } else {
+          mouseWorld = {
+            x: mouse.x / cam.scale + cam.x,
+            y: mouse.y / cam.scale + cam.y
+          };
+        }
+        const b = gameState.balls[myId];
+        const playerScreen = worldToScreen(b.x, b.y, cam);
+        const mouseScreen = worldToScreen(mouseWorld.x, mouseWorld.y, cam);
+        ctx.strokeStyle = '#f0f';
+        ctx.lineWidth = 3 * cam.scale;
+        ctx.beginPath();
+        ctx.moveTo(playerScreen.x, playerScreen.y);
+        ctx.lineTo(mouseScreen.x, mouseScreen.y);
+        ctx.stroke();
+      }
+    }
+
+    // Helper: world to screen coordinates
+    function worldToScreen(wx, wy, cam) {
+      if (cam.fullBoard) {
+        return {
+          x: wx * cam.scale + cam.offsetX,
+          y: wy * cam.scale + cam.offsetY
+        };
+      } else {
+        return {
+          x: (wx - cam.x) * cam.scale,
+          y: (wy - cam.y) * cam.scale
+        };
+      }
+    }
+
+    setInterval(render, 1000 / 60);
+
+    // Update button text on load
+    document.getElementById('view-btn').textContent = centerOnPlayer ? "Center On Me" : "Full Board";
+  </script>
+</body>
+</html>
